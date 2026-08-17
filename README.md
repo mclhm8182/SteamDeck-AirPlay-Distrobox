@@ -4,7 +4,7 @@
 
 # SteamDeck iOS AirPlay Setup
 
-A SteamOS iOS/iPadOS screen mirroring deployment solution based on Distrobox and UxPlay. 
+A SteamOS iOS/iPadOS/Mac screen mirroring deployment solution based on Distrobox and UxPlay. 
 This workflow is specifically optimized for SteamOS Gaming Mode (and also works in Desktop Mode), resolving default environment issues such as hardware decoding failures, adaptive scaling anomalies, and network connection freezing.
 
 ## Features
