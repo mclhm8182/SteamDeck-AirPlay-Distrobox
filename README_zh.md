@@ -58,6 +58,9 @@ cat << 'EOF' > ~/Desktop/Start_AirPlay.sh
 #!/bin/bash
 unset LD_PRELOAD
 
+# 【新增】宿主机级双保险：在进入容器前，强制在 SteamOS 最外层斩断所有残留的投屏幽灵进程
+pkill -9 -f uxplay 2>/dev/null
+
 # 挂起防息屏心跳机制
 (
     while true; do
@@ -69,7 +72,9 @@ AWAKE_PID=$!
 
 distrobox enter uxplay-env -- bash -l -c "
 echo 'Cleaning network cache and dead ports...'
-sudo killall -9 avahi-daemon uxplay 2>/dev/null
+# 【修正】使用系统更底层的 pkill 替代 killall，彻底解决端口占用 (Socket 98) 报错
+sudo pkill -9 avahi-daemon 2>/dev/null
+sudo pkill -9 uxplay 2>/dev/null
 sudo rm -f /var/run/dbus/pid /run/avahi-daemon/pid
 
 echo 'Starting D-Bus...'
