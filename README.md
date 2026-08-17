@@ -1,7 +1,7 @@
 # SteamDeck iOS AirPlay Setup
 
 基于 Distrobox 和 UxPlay 的 SteamOS iOS/iPadOS 屏幕镜像投屏部署方案。
-该工作流专为 SteamOS 游戏模式 (Gaming Mode) 优化，解决了默认环境下的硬件解码失效、自适应缩放异常以及网络连接假死等问题。
+该工作流专为 SteamOS 游戏模式 (Gaming Mode) （也可以用于桌面模式）优化，解决了默认环境下的硬件解码失效、自适应缩放异常以及网络连接假死等问题。
 
 ## 核心特性
 
@@ -26,7 +26,9 @@
 ```bash
 distrobox create --image ubuntu:latest --name uxplay-env
 ```
-> 注：国内网络环境如遇 TLS 握手超时，可将源替换为国内镜像加速，例如 `distrobox create --image docker.1panel.live/library/ubuntu:latest --name uxplay-env`。
+> 注：国内网络环境如遇 TLS 握手超时，可将源替换为国内镜像加速，例如
+```bash
+distrobox create --image docker.1panel.live/library/ubuntu:latest --name uxplay-env
 
 ### 2. 安装底层依赖与硬解插件
 进入已创建的容器：
