@@ -58,6 +58,9 @@ cat << 'EOF' > ~/Desktop/Start_AirPlay.sh
 #!/bin/bash
 unset LD_PRELOAD
 
+# [NEW] Host-level double insurance: Force kill any residual AirPlay zombie processes on SteamOS before entering the container
+pkill -9 -f uxplay 2>/dev/null
+
 # Suspend anti-sleep heartbeat mechanism
 (
     while true; do
@@ -69,7 +72,9 @@ AWAKE_PID=$!
 
 distrobox enter uxplay-env -- bash -l -c "
 echo 'Cleaning network cache and dead ports...'
-sudo killall -9 avahi-daemon uxplay 2>/dev/null
+# [FIX] Use pkill instead of killall to completely resolve port occupation (Socket 98) errors
+sudo pkill -9 avahi-daemon 2>/dev/null
+sudo pkill -9 uxplay 2>/dev/null
 sudo rm -f /var/run/dbus/pid /run/avahi-daemon/pid
 
 echo 'Starting D-Bus...'
@@ -105,7 +110,7 @@ To bypass Gamescope's strict kill mechanism for windowless processes, the script
 
 ## Usage & FAQ
 
-* **Starting AirPlay**: Switch to Gaming Mode and launch the `AirPlay` shortcut. Wait for the black terminal window to appear, then open the Control Center on your iOS/iPadOS device, click "Screen Mirroring," and select your Steam Deck. When finished, press the `STEAM Button` and select "Exit Game" to release all background processes. In Desktop Mode, simply double-click the `Start_AirPlay.sh` script on your desktop to start mirroring (there might be no visual feedback, but mirroring will work normally).
+* **Starting AirPlay**: Switch to Gaming Mode and launch the `AirPlay` shortcut. Wait for the black terminal window to appear, then open the Control Center on your iOS/iPadOS device, click "Screen Mirroring," and select your Steam Deck. When finished, press the `STEAM Button` and select "Exit Game" to release all background processes. In Desktop Mode, simply double-click the `Start_AirPlay.sh` script on your desktop to start mirroring (there might be no visual feedback on launch, but mirroring will work normally).
 * **Screen Blocked by Terminal Window**: In Gaming Mode, if you hear audio but see no video, press the `STEAM Button` to bring up the left menu. Click on the running AirPlay program, and manually switch to the `UxPlay` video window from the multi-window list.
 * **Background Pushing Limitations**: This solution is based on reverse engineering of the AirPlay Mirroring protocol. Lacking official DRM certificate support, it does not support DLNA video stream background pushing via the TV icon in apps (e.g., YouTube, Bilibili). Your iOS screen must remain on during casting.
 * **Dim Screen Issue**: The anti-sleep script only prevents the device from going into deep sleep. If the screen dims while playing plugged in, press the `STEAM Button` in Gaming Mode -> Settings -> Display -> set "Dim screen while plugged in" to "Never".
