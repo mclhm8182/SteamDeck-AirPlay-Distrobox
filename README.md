@@ -29,6 +29,7 @@ distrobox create --image ubuntu:latest --name uxplay-env
 > 注：国内网络环境如遇 TLS 握手超时，可将源替换为国内镜像加速，例如
 ```bash
 distrobox create --image docker.1panel.live/library/ubuntu:latest --name uxplay-env
+```
 
 ### 2. 安装底层依赖与硬解插件
 进入已创建的容器：
