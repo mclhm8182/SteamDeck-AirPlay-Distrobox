@@ -12,6 +12,7 @@
 * **防休眠进程**: 投屏期间后台挂起守护进程，循环发送 `dbus` 活跃信号，阻止系统在长视频播放期间自动息屏。
 
 ---
+<img width="3024" height="4032" alt="IMG_1897" src="https://github.com/user-attachments/assets/17e74014-dadc-4751-908c-8ec539530231" />
 
 <img width="1280" height="800" alt="20260817133348_1" src="https://github.com/user-attachments/assets/83c2ff27-9f68-47ad-bad4-0be9d6a3bc84" />
 <img width="1280" height="800" alt="20260817133405_1" src="https://github.com/user-attachments/assets/798ce1dd-c0f3-4ac2-baf8-6f5c2630f04c" />
