@@ -13,6 +13,10 @@
 
 ---
 
+<img width="1280" height="800" alt="20260817133348_1" src="https://github.com/user-attachments/assets/83c2ff27-9f68-47ad-bad4-0be9d6a3bc84" />
+<img width="1280" height="800" alt="20260817133405_1" src="https://github.com/user-attachments/assets/798ce1dd-c0f3-4ac2-baf8-6f5c2630f04c" />
+<img width="1280" height="800" alt="20260817133838_1" src="https://github.com/user-attachments/assets/87317102-5a47-4cfe-a07b-038117132333" />
+
 ## 部署流程
 
 ### 1. 创建 Ubuntu 容器环境
@@ -87,6 +91,7 @@ chmod +x ~/Desktop/Start_AirPlay.sh
 3. **名称**: 修改为 `AirPlay`（或任意自定义名称）。
 4. **目标 (Target)**: 填写 `"/usr/bin/konsole"` （需包含双引号）。
 5. **启动选项 (Launch Options)**: 填写 `--fullscreen -e /home/deck/Desktop/Start_AirPlay.sh`。
+<img width="1280" height="800" alt="20260817133326_1" src="https://github.com/user-attachments/assets/c9a303c4-a06b-459e-90f1-0e801a826852" />
 
 ---
 
