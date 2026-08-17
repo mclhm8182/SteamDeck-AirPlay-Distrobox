@@ -4,7 +4,7 @@
 
 # SteamDeck iOS AirPlay Setup
 
-基于 Distrobox 和 UxPlay 的 SteamOS iOS/iPadOS 屏幕镜像投屏部署方案。
+基于 Distrobox 和 UxPlay 的 SteamOS iOS/iPadOS/Mac 屏幕镜像投屏部署方案。
 该工作流专为 SteamOS 游戏模式 (Gaming Mode) （也可以用于桌面模式）优化，解决了默认环境下的硬件解码失效、自适应缩放异常以及网络连接假死等问题。
 
 ## 核心特性
