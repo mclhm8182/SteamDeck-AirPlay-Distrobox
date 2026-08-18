@@ -5,15 +5,15 @@
 # SteamDeck iOS AirPlay Setup
 
 基于 Distrobox 和 UxPlay 的 SteamOS iOS/iPadOS/Mac 屏幕镜像投屏部署方案。
-该工作流专为 SteamOS 游戏模式 (Gaming Mode) （也可以用于桌面模式）优化，解决了默认环境下的硬件解码失效、自适应缩放异常以及网络连接假死等问题。
+该工作流专为 SteamOS 游戏模式 (Gaming Mode) 与桌面模式 (Desktop Mode) 深度优化，彻底解决了默认环境下的硬件解码失效、自适应缩放异常、网络连接假死以及休眠断连等痛点。
 
-## 核心特性
+## 核心特性与优化
 
-* **容器化部署**: 依托 Distrobox 与精简版 Ubuntu 镜像，环境数据储存在不受系统大版本更新影响的 `/home` 目录。
+* **智能环境识别与交互**: 自动判定当前运行模式。游戏模式下静默全屏启动；桌面模式下自动拉起专属终端，并提供**手柄十字键交互菜单**，可自由选择“独立窗口”或“沉浸全屏”。
+* **全局低延迟锁定 (30 FPS)**: 针对苹果 AirPlay 镜像协议进行调优，强制锁定 30 帧，大幅降低视频推流时的局域网拥堵，彻底解决老旧设备（如 iPad 6）及 2.4G Wi-Fi 环境下的“画面延迟与音画不同步”问题。
+* **容器化无损部署**: 依托 Distrobox 与精简版 Ubuntu 镜像，环境数据储存在不受系统大版本更新影响的 `/home` 目录，一次部署，终身免维护。
 * **AMD 硬件解码**: 透传 SteamOS 底层驱动 (`-avdec`) 并关闭时间戳缓冲 (`-vsync no`)，大幅降低输入延迟。
-* **自适应全屏**: 兼容 Gamescope 视窗管理器，强制画面拉伸铺满屏幕 (`-fs`)，解决视频全屏播放时的边界裁切与缩放异常。
-* **连接稳定性**: 启动前自动清理 Avahi 广播缓存与死锁端口，调整默认心跳断连阈值 (`-reset 15`)，修复重复连接导致的假死报错。
-* **防休眠进程**: 投屏期间后台挂起守护进程，循环发送 `dbus` 活跃信号，阻止系统在长视频播放期间自动息屏。
+* **激进防休眠守护**: 投屏期间后台挂起守护进程，每 45 秒循环发送 `dbus` 活跃心跳，彻底击穿系统激进的省电策略，阻止长视频播放期间自动息屏。
 
 ---
 <img width="3024" height="4032" alt="IMG_1897" src="https://github.com/user-attachments/assets/17e74014-dadc-4751-908c-8ec539530231" />
@@ -50,48 +50,149 @@ sudo apt install -y dbus avahi-daemon uxplay gstreamer1.0-vaapi mesa-va-drivers 
 ```
 安装完成后，执行 `exit` 退出容器。
 
-### 3. 生成一键启动脚本
-在桌面模式的 Konsole 终端中，直接复制并运行以下整段代码。此操作会在桌面生成名为 `Start_AirPlay.sh` 的可执行脚本：
+### 3. 生成一键自适应启动脚本
+在桌面模式的 Konsole 终端中，直接复制并运行以下整段代码。此操作会在桌面生成调优后的 `Start_AirPlay.sh` 可执行脚本：
 
 ```bash
 cat << 'EOF' > ~/Desktop/Start_AirPlay.sh
 #!/bin/bash
 unset LD_PRELOAD
 
-# 【新增】宿主机级双保险：在进入容器前，强制在 SteamOS 最外层斩断所有残留的投屏幽灵进程
+TARGET_FPS=30
+FPS_NAME="30 FPS (影音低延迟稳定版)"
+
+# 1. 智能环境判定
+if [ -n "$SteamTenfoot" ]; then
+    IS_GAMEMODE=1
+else
+    IS_GAMEMODE=0
+fi
+
+# 桌面模式拉起终端窗口
+if [ $IS_GAMEMODE -eq 0 ] && { [ "$XDG_SESSION_TYPE" = "x11" ] || [ "$XDG_SESSION_TYPE" = "wayland" ]; }; then
+    if [ -z "$_RUNNING_IN_KONSOLE" ]; then
+        export _RUNNING_IN_KONSOLE=1
+        exec konsole --nofork -e "$0" "$@"
+    fi
+fi
+
+# 宿主机级幽灵进程清理
 pkill -9 -f uxplay 2>/dev/null
 
-# 挂起防息屏心跳机制
+# -------------------------------------------------------------
+# 🎮 手柄十字键菜单函数 (仅在桌面模式触发)
+# -------------------------------------------------------------
+interactive_menu() {
+    local sel=1
+    local timeout_sec=3
+    local start_time=$(date +%s)
+
+    while true; do
+        local now=$(date +%s)
+        local elapsed=$((now - start_time))
+        local remain=$((timeout_sec - elapsed))
+
+        if [ $remain -le 0 ]; then
+            break
+        fi
+
+        clear
+        echo -e "\033[1;36m=========================================================\033[0m"
+        echo -e "\033[1;37m        📺 请选择桌面显示模式 (当前锁定 30 FPS) \033[0m"
+        echo -e "\033[1;36m=========================================================\033[0m"
+        echo -e "\033[1;33m 🎮 [操作] 十字键/左摇杆 ↑↓ 切换  |  🟢 A键 / Enter 确认\033[0m"
+        echo -e "\033[1;90m ⏱️  倒计时 ${remain} 秒后自动进入默认的 [独立窗口]...\033[0m"
+        echo -e "\033[1;90m ---------------------------------------------------------\033[0m"
+
+        if [ "$sel" -eq 1 ]; then
+            echo -e " \033[1;32m➔ [ ▶ 1. 独立窗口 (默认) - 可拖拽缩放，带 X 关闭按钮 ]\033[0m"
+            echo -e " \033[0;37m     2. 强制全屏 (沉浸) - 画面铺满屏幕，遮挡底部任务栏\033[0m"
+        else
+            echo -e " \033[0;37m     1. 独立窗口 (默认) - 可拖拽缩放，带 X 关闭按钮\033[0m"
+            echo -e " \033[1;32m➔ [ ▶ 2. 强制全屏 (沉浸) - 画面铺满屏幕，遮挡底部任务栏 ]\033[0m"
+        fi
+        echo -e "\033[1;90m ---------------------------------------------------------\033[0m"
+
+        IFS= read -rsn1 -t 1 key
+        if [ $? -eq 0 ]; then
+            start_time=$(date +%s)
+            timeout_sec=10 
+
+            if [ "$key" = $'\x1b' ]; then
+                read -rsn2 -t 0.1 rest
+                key+="$rest"
+            fi
+
+            case "$key" in
+                $'\x1b[A'|"[A"|"w"|"W") sel=1 ;;
+                $'\x1b[B'|"[B"|"s"|"S") sel=2 ;;
+                ""|$'\n'|" "|"a"|"A") break ;;
+                "1") sel=1; break ;;
+                "2") sel=2; break ;;
+            esac
+        fi
+    done
+    MENU_CHOICE=$sel
+}
+
+# 2. 核心逻辑分流
+if [ $IS_GAMEMODE -eq 1 ]; then
+    # 游戏模式：静默跳过菜单，强制全屏
+    UXPLAY_FS="-fs"
+    WIN_NAME="游戏模式全屏"
+    EXIT_TIP="* 提示：退出投屏时，请直接按 STEAM 键选择“退出游戏”"
+else
+    # 桌面模式：弹出交互式选择菜单
+    interactive_menu
+    if [ "$MENU_CHOICE" -eq 2 ]; then
+        UXPLAY_FS="-fs"
+        WIN_NAME="桌面全屏"
+        EXIT_TIP="* ⚠️ 提示：桌面全屏下若快捷键失效，在手机端断开投屏即可退出"
+    else
+        UXPLAY_FS=""
+        WIN_NAME="独立窗口"
+        EXIT_TIP="* 提示：您可以随时点击窗口右上角的 X 按钮关闭投屏"
+    fi
+fi
+
+# 3. 防息屏心跳 (45秒对抗休眠)
 (
     while true; do
         dbus-send --session --dest=org.freedesktop.ScreenSaver --type=method_call /org/freedesktop/ScreenSaver org.freedesktop.ScreenSaver.SimulateUserActivity 2>/dev/null
-        sleep 180
+        sleep 45
     done
 ) &
 AWAKE_PID=$!
 
+cleanup() {
+    kill -9 $AWAKE_PID 2>/dev/null
+    pkill -9 -f uxplay 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+# 4. 进入容器并运行主程序
 distrobox enter uxplay-env -- bash -l -c "
-echo 'Cleaning network cache and dead ports...'
-# 【修正】使用系统更底层的 pkill 替代 killall，彻底解决端口占用 (Socket 98) 报错
+clear
+echo -e '\033[1;36m=========================================================\033[0m'
+echo -e '\033[1;37m        📺 Steam Deck AirPlay 专属屏幕镜像终端 \033[0m'
+echo -e '\033[1;36m=========================================================\033[0m'
+echo -e '\033[1;32m [状态] 🟢 服务已就绪 ($FPS_NAME | $WIN_NAME)\033[0m'
+echo -e '\033[1;33m [操作] 请在您的苹果设备控制中心点击【屏幕镜像】进行连接\033[0m'
+echo -e '\033[1;90m ---------------------------------------------------------\033[0m'
+echo -e '\033[1;90m ${EXIT_TIP}\033[0m'
+echo -e '\033[1;90m ---------------------------------------------------------\033[0m'
+
 sudo pkill -9 avahi-daemon 2>/dev/null
 sudo pkill -9 uxplay 2>/dev/null
 sudo rm -f /var/run/dbus/pid /run/avahi-daemon/pid
 
-echo 'Starting D-Bus...'
-sudo service dbus start
-sleep 1
+sudo service dbus start >/dev/null 2>&1
+sleep 1 
+sudo avahi-daemon --daemonize >/dev/null 2>&1
+sleep 1 
 
-echo 'Starting Avahi daemon...'
-sudo avahi-daemon --daemonize
-sleep 1
-
-echo 'Starting UxPlay...'
-uxplay -p -fps 60 -vsync no -reset 15 -fs
+uxplay -p -fps $TARGET_FPS -vsync no -reset 15 ${UXPLAY_FS} > /tmp/uxplay.log
 "
-
-# 清理进程并恢复原生电源策略
-kill -9 $AWAKE_PID 2>/dev/null
-sleep 3
 EOF
 chmod +x ~/Desktop/Start_AirPlay.sh
 ```
@@ -110,11 +211,11 @@ chmod +x ~/Desktop/Start_AirPlay.sh
 
 ## 使用说明与常见问题
 
-* **启动投屏**: 切换至游戏模式，运行配置好的 `AirPlay` 快捷方式。等待出现终端黑屏后，在 iOS/iPadOS 控制中心点击“屏幕镜像”并选择 Steam Deck 设备。退出时按 `STEAM 键` 选择退出游戏即可释放所有后台进程。在桌面模式，则直接双击桌面Start_AirPlay.sh打开即可投屏（可能没有任何反馈，但是可以正常投屏）。
-* **画面被终端窗口遮挡**: 游戏模式下，若遇到有声音无画面，按 `STEAM 键` 呼出左侧菜单，点击当前运行的 AirPlay 程序，在弹出的多窗口列表中手动切换至 `UxPlay` 视频窗口即可。
+* **启动投屏**: 切换至游戏模式，运行配置好的 `AirPlay` 快捷方式。等待出现绿字终端界面后，在 iOS/iPadOS 控制中心点击“屏幕镜像”并选择 Steam Deck 设备。退出时按 `STEAM 键` 选择退出游戏即可释放所有后台进程。
+* **在桌面模式投屏**: 直接双击桌面的 `Start_AirPlay.sh`，会弹出专属交互菜单，可用手柄方向键选择“独立窗口”或“全屏模式”，3秒不操作自动进入默认窗口模式。
+* **画面被终端窗口遮挡**: 极少数情况下在游戏模式遇到有声音无画面，按 `STEAM 键` 呼出左侧菜单，点击当前运行的 AirPlay 程序，在弹出的多窗口列表中手动切换至 `UxPlay` 视频窗口即可。
 * **关于后台推送限制**: 本方案基于 AirPlay Mirroring 屏幕镜像协议逆向，因缺乏官方 DRM 证书支持，不支持通过应用内（如 Bilibili、YouTube）的 TV 图标进行 DLNA 视频流后台推送。投屏期间需保持 iOS 端屏幕常亮。
-* **屏幕变暗（Dim Screen）问题**: 防息屏脚本仅阻止设备进入睡眠状态。若插电播放期间屏幕变暗，请在游戏模式按 `STEAM 键` -> 设置 -> 显示 -> 将“插电时屏幕变暗”设置为“从不”。
+* **屏幕变暗（Dim Screen）问题**: 防息屏脚本已在后台维持 45 秒心跳机制。若插电播放期间屏幕依旧变暗，请在游戏模式按 `STEAM 键` -> 设置 -> 显示 -> 将“插电时屏幕变暗”设置为“从不”。
 
 ---
 *Based on the open-source implementation by the [UxPlay](https://github.com/FDH2/UxPlay) community.*
-
